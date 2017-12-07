@@ -1,0 +1,65 @@
+Index: app/code/Magento/MageConf/Setup/InstallData.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/Setup/InstallData.php	(revision )
++++ app/code/Magento/MageConf/Setup/InstallData.php	(revision )
+@@ -0,0 +1,57 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++namespace Magento\MageConf\Setup;
++
++use Magento\Catalog\Api\Data\ProductInterface;
++use Magento\Catalog\Model\ProductRepository;
++use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
++use Magento\Framework\Setup\InstallDataInterface;
++use Magento\Framework\Setup\ModuleContextInterface;
++use Magento\Framework\Setup\ModuleDataSetupInterface;
++
++/**
++ * @codeCoverageIgnore
++ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
++ */
++class InstallData implements InstallDataInterface
++{
++    /**
++     * @var CollectionFactory
++     */
++    private $collectionFactory;
++    /**
++     * @var ProductRepository
++     */
++    private $productRepository;
++
++    /**
++     * InstallData constructor.
++     * @param CollectionFactory $collectionFactory
++     * @param ProductRepository $productRepository
++     */
++    public function __construct(CollectionFactory $collectionFactory, ProductRepository $productRepository)
++    {
++        $this->collectionFactory = $collectionFactory;
++        $this->productRepository = $productRepository;
++    }
++
++    /**
++     * {@inheritdoc}
++     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
++     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
++     * @SuppressWarnings(PHPMD.NPathComplexity)
++     */
++    public function install(ModuleDataSetupInterface $setup, ModuleContextInterface $context)
++    {
++        $collection = $this->collectionFactory->create();
++        /** @var ProductInterface $item */
++        foreach ($collection as $item) {
++            $item->setSku('prefix_' . $item->getSku());
++            $this->productRepository->save($item);
++        }
++    }
++}

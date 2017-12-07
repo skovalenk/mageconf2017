@@ -1,0 +1,54 @@
+Index: app/code/Magento/MageConf/Console/Command/MageConf.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/Console/Command/MageConf.php	(revision )
++++ app/code/Magento/MageConf/Console/Command/MageConf.php	(revision )
+@@ -0,0 +1,27 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++namespace Magento\MageConf\Console\Command;
++
++use Symfony\Component\Console\Command\Command;
++
++/**
++ * Class DevTestsRunCommand
++ *
++ * Runs tests (unit, static, integration, etc.)
++ */
++class MageConf extends Command
++{
++    /**
++     * {@inheritdoc}
++     */
++    protected function configure()
++    {
++        $this->setName('mageconf:test')
++            ->setDescription('Runs tests');
++        $this->addArgument('arg1', []);
++        parent::configure();
++    }
++}
+Index: app/code/Magento/MageConf/etc/di.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/etc/di.xml	(date 1512633613000)
++++ app/code/Magento/MageConf/etc/di.xml	(revision )
+@@ -6,4 +6,11 @@
+  */
+ -->
+ <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
++    <type name="\Magento\Framework\Console\CommandList">
++        <arguments>
++            <argument name="commands" xsi:type="array">
++                <item name="mage_conf_command" xsi:type="object">\Magento\MageConf\Console\Command\MageConf</item>
++            </argument>
++        </arguments>
++    </type>
+ </config>

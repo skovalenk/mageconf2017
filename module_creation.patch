@@ -1,0 +1,53 @@
+Index: app/code/Magento/MageConf/registration.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/registration.php	(revision )
++++ app/code/Magento/MageConf/registration.php	(revision )
+@@ -0,0 +1,9 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++use \Magento\Framework\Component\ComponentRegistrar;
++
++ComponentRegistrar::register(ComponentRegistrar::MODULE, 'Magento_MageConf', __DIR__);
+Index: app/code/Magento/MageConf/etc/module.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/etc/module.xml	(revision )
++++ app/code/Magento/MageConf/etc/module.xml	(revision )
+@@ -0,0 +1,11 @@
++<?xml version="1.0"?>
++<!--
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++-->
++<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
++    <module name="Magento_MageConf" setup_version="2.0.0">
++    </module>
++</config>
+Index: app/code/Magento/MageConf/etc/di.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConf/etc/di.xml	(revision )
++++ app/code/Magento/MageConf/etc/di.xml	(revision )
+@@ -0,0 +1,9 @@
++<?xml version="1.0"?>
++<!--
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++-->
++<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
++</config>
