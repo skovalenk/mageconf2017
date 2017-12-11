@@ -1,0 +1,298 @@
+Index: lib/internal/Magento/Framework/App/MessageCollector.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/internal/Magento/Framework/App/MessageCollector.php	(revision )
++++ lib/internal/Magento/Framework/App/MessageCollector.php	(revision )
+@@ -0,0 +1,29 @@
++<?php
++/**
++ * Front controller responsible for dispatching application requests
++ *
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++namespace Magento\Framework\App;
++
++class MessageCollector
++{
++    const WARNING = 1;
++
++    const ERROR = 2;
++
++    const LOG = 0;
++
++    private $messages = [];
++
++    public function addMessage($message, $level = self::ERROR)
++    {
++        $this->messages[$level][] = $message;
++    }
++
++    public function getMessages($level = self::ERROR)
++    {
++        return isset($this->messages[$level]) ? $this->messages[$level] : [];
++    }
++}
+Index: lib/internal/Magento/Framework/App/Router/Base.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/internal/Magento/Framework/App/Router/Base.php	(date 1513000354000)
++++ lib/internal/Magento/Framework/App/Router/Base.php	(revision )
+@@ -6,6 +6,7 @@
+  * See COPYING.txt for license details.
+  */
+ namespace Magento\Framework\App\Router;
++use Magento\Framework\App\MessageCollector;
+ 
+ /**
+  * @SuppressWarnings(PHPMD.TooManyFields)
+@@ -110,6 +111,10 @@
+      * @var \Magento\Framework\App\Router\PathConfigInterface
+      */
+     protected $pathConfig;
++    /**
++     * @var MessageCollector
++     */
++    private $messageCollector;
+ 
+     /**
+      * @param \Magento\Framework\App\Router\ActionList $actionList
+@@ -121,7 +126,7 @@
+      * @param \Magento\Framework\Code\NameBuilder $nameBuilder
+      * @param \Magento\Framework\App\Router\PathConfigInterface $pathConfig
+      *
+-     * @throws \InvalidArgumentException
++     * @param MessageCollector $messageCollector
+      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
+      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+      */
+@@ -133,7 +138,8 @@
+         \Magento\Framework\App\Route\ConfigInterface $routeConfig,
+         \Magento\Framework\UrlInterface $url,
+         \Magento\Framework\Code\NameBuilder $nameBuilder,
+-        \Magento\Framework\App\Router\PathConfigInterface $pathConfig
++        \Magento\Framework\App\Router\PathConfigInterface $pathConfig,
++        MessageCollector $messageCollector
+     ) {
+         $this->actionList = $actionList;
+         $this->actionFactory = $actionFactory;
+@@ -143,6 +149,7 @@
+         $this->_url = $url;
+         $this->nameBuilder = $nameBuilder;
+         $this->pathConfig = $pathConfig;
++        $this->messageCollector = $messageCollector;
+     }
+ 
+     /**
+@@ -262,6 +269,10 @@
+     {
+         $moduleFrontName = $this->matchModuleFrontName($request, $params['moduleFrontName']);
+         if (empty($moduleFrontName)) {
++            $this->messageCollector->addMessage(
++                sprintf("Cannot find moduleFrontName: %s", $moduleFrontName),
++                MessageCollector::ERROR
++            );
+             return null;
+         }
+ 
+@@ -271,6 +282,10 @@
+         $modules = $this->_routeConfig->getModulesByFrontName($moduleFrontName);
+ 
+         if (empty($modules) === true) {
++            $this->messageCollector->addMessage(
++                sprintf("Cannot find modules by moduleFrontName: %s", $moduleFrontName),
++                MessageCollector::ERROR
++            );
+             return null;
+         }
+ 
+@@ -304,6 +319,10 @@
+                 return null;
+             }
+             $action = 'noroute';
++            $this->messageCollector->addMessage(
++                sprintf("Cannot instantiate actionInstance: %s"),
++                MessageCollector::ERROR
++            );
+         }
+ 
+         // set values only after all the checks are done
+Index: lib/internal/Magento/Framework/App/Router/ActionList.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/internal/Magento/Framework/App/Router/ActionList.php	(date 1513000354000)
++++ lib/internal/Magento/Framework/App/Router/ActionList.php	(revision )
+@@ -6,6 +6,7 @@
+  */
+ namespace Magento\Framework\App\Router;
+ 
++use Magento\Framework\App\MessageCollector;
+ use Magento\Framework\Serialize\SerializerInterface;
+ use Magento\Framework\Serialize\Serializer\Serialize;
+ use Magento\Framework\Module\Dir\Reader as ModuleReader;
+@@ -36,6 +37,10 @@
+         'public', 'require', 'return', 'static', 'switch', 'throw', 'trait', 'try', 'unset', 'use', 'var',
+         'while', 'xor', 'void',
+     ];
++    /**
++     * @var MessageCollector
++     */
++    private $messageCollector;
+ 
+     /**
+      * @var SerializerInterface
+@@ -52,6 +57,7 @@
+      *
+      * @param \Magento\Framework\Config\CacheInterface $cache
+      * @param ModuleReader $moduleReader
++     * @param MessageCollector $messageCollector
+      * @param string $actionInterface
+      * @param string $cacheKey
+      * @param array $reservedWords
+@@ -60,6 +66,7 @@
+     public function __construct(
+         \Magento\Framework\Config\CacheInterface $cache,
+         ModuleReader $moduleReader,
++        MessageCollector $messageCollector,
+         $actionInterface = \Magento\Framework\App\ActionInterface::class,
+         $cacheKey = 'app_action_list',
+         $reservedWords = [],
+@@ -75,6 +82,7 @@
+         } else {
+             $this->actions = $this->serializer->unserialize($data);
+         }
++        $this->messageCollector = $messageCollector;
+     }
+ 
+     /**
+@@ -92,6 +100,10 @@
+             $area = '\\' . $area;
+         }
+         if (strpos($namespace, self::NOT_ALLOWED_IN_NAMESPACE_PATH) !== false) {
++            $this->messageCollector->addMessage(
++                sprintf("Adminhtml is not allowed in namespace path"),
++                MessageCollector::ERROR
++            );
+             return null;
+         }
+         if (in_array(strtolower($action), $this->reservedWords)) {
+@@ -105,8 +117,35 @@
+             )
+         );
+         if (isset($this->actions[$fullPath])) {
++            if (!is_subclass_of($this->actions[$fullPath], $this->actionInterface)) {
++                $this->messageCollector->addMessage(
++                    sprintf("Action instance is not subclass of %s", $this->actionInterface),
++                    MessageCollector::ERROR
++                );
++            }
++
+             return is_subclass_of($this->actions[$fullPath], $this->actionInterface) ? $this->actions[$fullPath] : null;
+         }
++
++        $similars = [];
++
++        foreach ($this->actions as $key => $action) {
++            $key = str_replace("magento\\", "", $key);
++            $fullPath = str_replace("magento\\", "", $fullPath);
++            $similars[$key] = similar_text($key, $fullPath);
++        }
++
++        arsort($similars);
++        $similars = array_slice($similars, 0, 5);
++        $this->messageCollector->addMessage(
++            sprintf(
++                "Cannot find anything by path %s. Maybe you mean something like this: <br> %s",
++                $fullPath,
++                implode("<br>", array_keys($similars))
++            ),
++            MessageCollector::ERROR
++        );
++
+         return null;
+     }
+ }
+Index: lib/internal/Magento/Framework/App/FrontController.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- lib/internal/Magento/Framework/App/FrontController.php	(date 1513000354000)
++++ lib/internal/Magento/Framework/App/FrontController.php	(revision )
+@@ -18,17 +18,24 @@
+      * @var \Magento\Framework\App\ResponseInterface
+      */
+     protected $response;
++    /**
++     * @var MessageCollector
++     */
++    private $messageCollector;
+ 
+     /**
+      * @param RouterListInterface $routerList
+      * @param \Magento\Framework\App\ResponseInterface $response
++     * @param MessageCollector $messageCollector
+      */
+     public function __construct(
+         RouterListInterface $routerList,
+-        \Magento\Framework\App\ResponseInterface $response
++        \Magento\Framework\App\ResponseInterface $response,
++        MessageCollector $messageCollector
+     ) {
+         $this->_routerList = $routerList;
+         $this->response = $response;
++        $this->messageCollector = $messageCollector;
+     }
+ 
+     /**
+@@ -47,8 +54,17 @@
+             /** @var \Magento\Framework\App\RouterInterface $router */
+             foreach ($this->_routerList as $router) {
+                 try {
++                    $this->messageCollector->addMessage(
++                        sprintf("Router process %s", get_class($router)),
++                        MessageCollector::LOG
++                    );
+                     $actionInstance = $router->match($request);
++
+                     if ($actionInstance) {
++                        $this->messageCollector->addMessage(
++                            sprintf("Action Instance was found with name: %s", get_class($actionInstance)),
++                            MessageCollector::LOG
++                        );
+                         $request->setDispatched(true);
+                         $this->response->setNoCacheHeaders();
+                         if ($actionInstance instanceof \Magento\Framework\App\Action\AbstractAction) {
+@@ -59,10 +75,26 @@
+                         break;
+                     }
+                 } catch (\Magento\Framework\Exception\NotFoundException $e) {
++                    $this->messageCollector->addMessage("Not Found Exception: " . $e->getMessage());
+                     $request->initForward();
+                     $request->setActionName('noroute');
+                     $request->setDispatched(false);
+                     break;
++                } finally {
++                    if ($request->isDispatched()) {
++                        $logMessages = implode("<br>", $this->messageCollector->getMessages(MessageCollector::LOG));
++                        $errorMessages = implode("<br>",
++                            array_map(
++                                function($errorMessage) {
++                                    return '<span style="color: red">' . $errorMessage . '</span>';
++                                },
++                                $this->messageCollector->getMessages(MessageCollector::ERROR)
++                            )
++                        );
++                        $this->response->setBody(
++                            $this->response->getBody() . $logMessages . '<br>' . $errorMessages
++                        );
++                    }
+                 }
+             }
+         }
