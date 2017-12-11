@@ -1,0 +1,182 @@
+Index: app/code/Magento/MageConfLayout/view/base/templates/layout_output.phtml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfLayout/view/base/templates/layout_output.phtml	(revision )
++++ app/code/Magento/MageConfLayout/view/base/templates/layout_output.phtml	(revision )
+@@ -0,0 +1,83 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++// @codingStandardsIgnoreFile
++/**
++ * @var \Magento\MageConf\Block\LayoutOutput $this
++ * @var \Magento\MageConf\Block\LayoutOutput $block
++ */
++?>
++<?php if ($block->isEnabled()): ?>
++    <form onsubmit="navigate(); return false;">
++        <label for="layout_navigator">Block name</label>
++        <input name="layout_navigator"/>
++        <button type="submit">Submit</button>
++    </form>
++
++    <div id="layout_root"><?= $block->renderTree(['children' => $this->showAllNames()]); ?></div>
++<script>
++    function toogle(element) {
++        if (element.getAttribute('status') === 'hide') {
++            this.showElement(element);
++        } else {
++            this.hideElement(element);
++        }
++    }
++    
++    function showElement(element) {
++        if (element.getAttribute('status') === 'hide') {
++            element.setAttribute('status', 'expand');
++            element.innerHTML = element.innerHTML.replace('[+]', '[-]');
++            element.nextElementSibling.style.display = 'block';
++        }
++    }
++    
++    function hideElement(element) {
++        if (element.getAttribute('status') === 'expand') {
++            element.setAttribute('status', 'hide');
++            element.innerHTML = element.innerHTML.replace('[-]', '[+]');
++            element.nextElementSibling.style.display = 'none';
++        }
++    }
++
++    function navigate() {
++        var input = document.getElementsByName('layout_navigator'),
++            url = location.href.replace(/\#[\w\.\-\_]+/, ""),
++            el;
++
++        if (el = document.getElementById(input[0].value)) {
++            this.showElements(el);
++            location.href = url + "#" + input[0].value;
++            el.style['background-color'] = 'yellow';
++
++            setTimeout(function() {jQuery(el).animate({backgroundColor: "white"}, 'slow');}, 1000);
++        } else {
++            alert("Cannot find block name" + input[0].value);
++        }
++    }
++    
++    function showElements(childEl) {
++        var parent = childEl.parentNode.parentNode;
++
++        this.showElement(childEl.previousElementSibling);
++
++        if (parent.className.indexOf('expanded') !== -1) {
++            this.showElements(parent);
++        }
++    }
++
++    function showContent(element) {
++        if (element.getAttribute('status') !== 'hide') {
++            element.setAttribute('status', 'hide');
++            element.nextElementSibling.style.display = 'none';
++        } else {
++            element.setAttribute('status', 'expand');
++            element.nextElementSibling.style.display = 'block';
++        }
++    }
++</script>
++
++<?php endif; ?>
+Index: app/code/Magento/MageConf/Block/LayoutOutput.php
+===================================================================
+--- app/code/Magento/MageConf/Block/LayoutOutput.php	(date 1512987522000)
++++ app/code/Magento/MageConfLayout/Block/LayoutOutput.php	(revision )
+@@ -9,7 +9,6 @@
+ namespace Magento\MageConf\Block;
+ 
+ use Magento\Framework\View\Layout;
+-use Magento\Framework\View\LayoutInterface;
+ 
+ class LayoutOutput extends \Magento\Framework\View\Element\Template
+ {
+@@ -25,22 +24,28 @@
+      */
+     public function renderTree($result, $output = '')
+     {
++        $status = $this->getRequest()->getParam('expand') ? 'expand': 'hide';
++        $display = $this->getRequest()->getParam('expand') ? 'block': 'none';
++        $symbol =$this->getRequest()->getParam('expand') ? '[-]': '[+]';
++
+         foreach ($result['children'] as $name => $item) {
+             if ($name === $this->getNameInLayout()) {
+                 continue;
+             }
+ 
+-            $link = '<a href="javascript:void(0);" status="hide" onclick="toogle(this)">[+]' . $name . '</a>
+-                    <div style="display: none">' . $this->renderTree($item) . '</div>';
++            $link = '<a href="javascript:void(0);" status="' . $status . '" onclick="toogle(this)">' . $symbol . $name . '</a>
++                    <div id="' . $name .'" class="animtated expanded" style="display: ' . $display . '">' . $this->renderTree($item) . '</div>';
+             $output .= '<div style="position: relative; margin: 20px">';
+ 
+             if (!count($item['children'])) {
+-                $output .= '<a href="javascript:void(0);" status="hide" onclick="showContent(this)">' . $name . '</a>';
+-                $output .= sprintf('<div style="display: none">Content: %s</div>', $this->getLayout()->renderElement($name));
++                $output .= '<a href="javascript:void(0);" status="' . $status . '" onclick="showContent(this)">' . $name . '</a>';
++                $output .= sprintf('<div id="' . $name .'" style="display: ' . $display . '"><b>Content</b>: %s</div>',
++                    htmlspecialchars($this->getLayout()->renderElement($name))
++                );
+ 
+                 if (isset($item['template'])) {
+-                    $output .= sprintf('<div>Template: %s</div>', $item['template']);
+-                    $output .= sprintf('<div>Block Class: %s</div>', $item['blockClass']);
++                    $output .= sprintf('<div><b>Template</b>: %s</div>', $item['template']);
++                    $output .= sprintf('<div><b>Block Class</b>: %s</div>', $item['blockClass']);
+                 }
+             } else {
+                 $output .= $link;
+@@ -50,6 +55,11 @@
+         return $output;
+     }
+ 
++    public function isEnabled()
++    {
++        return $this->getRequest()->getParam('render_layout_tree');
++    }
++
+     /**
+      * @param Layout $layout
+      * @param string $name
+Index: app/code/Magento/MageConf/etc/di.xml
+===================================================================
+--- app/code/Magento/MageConf/etc/di.xml	(date 1512987522000)
++++ app/code/Magento/MageConfLayout/etc/di.xml	(revision )
+@@ -1,0 +1,0 @@
+Index: app/code/Magento/MageConf/Model/Plugin/LayoutOutput.php
+===================================================================
+--- app/code/Magento/MageConf/Model/Plugin/LayoutOutput.php	(date 1512987522000)
++++ app/code/Magento/MageConfLayout/Model/Plugin/LayoutOutput.php	(revision )
+@@ -1,0 +1,0 @@
+Index: app/code/Magento/MageConf/etc/module.xml
+===================================================================
+--- app/code/Magento/MageConf/etc/module.xml	(date 1512987522000)
++++ app/code/Magento/MageConfLayout/etc/module.xml	(revision )
+@@ -6,6 +6,6 @@
+  */
+ -->
+ <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+-    <module name="Magento_MageConf" setup_version="2.0.0">
++    <module name="Magento_MageConfLayout" setup_version="2.0.0">
+     </module>
+ </config>
+Index: app/code/Magento/MageConf/registration.php
+===================================================================
+--- app/code/Magento/MageConf/registration.php	(date 1512987522000)
++++ app/code/Magento/MageConfLayout/registration.php	(revision )
+@@ -6,4 +6,4 @@
+ 
+ use \Magento\Framework\Component\ComponentRegistrar;
+ 
+-ComponentRegistrar::register(ComponentRegistrar::MODULE, 'Magento_MageConf', __DIR__);
++ComponentRegistrar::register(ComponentRegistrar::MODULE, 'Magento_MageConfLayout', __DIR__);

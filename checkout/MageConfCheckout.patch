@@ -1,0 +1,428 @@
+Index: app/code/Magento/MageConfCheckout/view/frontend/web/js/view/payment/default.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/view/frontend/web/js/view/payment/default.js	(revision )
++++ app/code/Magento/MageConfCheckout/view/frontend/web/js/view/payment/default.js	(revision )
+@@ -0,0 +1,238 @@
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++define([
++    'ko',
++    'jquery',
++    'uiComponent',
++    'Magento_Checkout/js/action/place-order',
++    'Magento_Checkout/js/action/select-payment-method',
++    'Magento_Checkout/js/model/quote',
++    'Magento_Customer/js/model/customer',
++    'Magento_Checkout/js/model/payment-service',
++    'Magento_Checkout/js/checkout-data',
++    'Magento_Checkout/js/model/checkout-data-resolver',
++    'uiRegistry',
++    'Magento_Checkout/js/model/payment/additional-validators',
++    'Magento_Ui/js/model/messages',
++    'uiLayout',
++    'Magento_Checkout/js/action/redirect-on-success'
++], function (
++    ko,
++    $,
++    Component,
++    placeOrderAction,
++    selectPaymentMethodAction,
++    quote,
++    customer,
++    paymentService,
++    checkoutData,
++    checkoutDataResolver,
++    registry,
++    additionalValidators,
++    Messages,
++    layout,
++    redirectOnSuccessAction
++) {
++    'use strict';
++
++    return Component.extend({
++        redirectAfterPlaceOrder: true,
++        isPlaceOrderActionAllowed: ko.observable(quote.billingAddress() != null),
++
++        /**
++         * After place order callback
++         */
++        afterPlaceOrder: function () {
++            // Override this function and put after place order logic here
++        },
++
++        /**
++         * Initialize view.
++         *
++         * @return {exports}
++         */
++        initialize: function () {
++            var billingAddressCode,
++                billingAddressData,
++                defaultAddressData;
++
++            this._super().initChildren();
++            quote.billingAddress.subscribe(function (address) {
++                this.isPlaceOrderActionAllowed(address !== null);
++            }, this);
++            checkoutDataResolver.resolveBillingAddress();
++
++            billingAddressCode = 'billingAddress' + this.getCode();
++            registry.async('checkoutProvider')(function (checkoutProvider) {
++                defaultAddressData = checkoutProvider.get(billingAddressCode);
++
++                if (defaultAddressData === undefined) {
++                    // Skip if payment does not have a billing address form
++                    return;
++                }
++                billingAddressData = checkoutData.getBillingAddressFromData();
++
++                if (billingAddressData) {
++                    checkoutProvider.set(
++                        billingAddressCode,
++                        $.extend(true, {}, defaultAddressData, billingAddressData)
++                    );
++                }
++                checkoutProvider.on(billingAddressCode, function (providerBillingAddressData) {
++                    checkoutData.setBillingAddressFromData(providerBillingAddressData);
++                }, billingAddressCode);
++            });
++
++            return this;
++        },
++
++        /**
++         * Initialize child elements
++         *
++         * @returns {Component} Chainable.
++         */
++        initChildren: function () {
++            this.messageContainer = new Messages();
++            this.createMessagesComponent();
++
++            return this;
++        },
++
++        /**
++         * Create child message renderer component
++         *
++         * @returns {Component} Chainable.
++         */
++        createMessagesComponent: function () {
++
++            var messagesComponent = {
++                parent: this.name,
++                name: this.name + '.messages',
++                displayArea: 'messages',
++                component: 'Magento_Ui/js/view/messages',
++                config: {
++                    messageContainer: this.messageContainer
++                }
++            };
++
++            layout([messagesComponent]);
++
++            return this;
++        },
++
++        /**
++         * Place order.
++         */
++        placeOrder: function (data, event) {
++            var self = this;
++
++            if (event) {
++                event.preventDefault();
++            }
++
++            if (this.validate() && additionalValidators.validate()) {
++               // this.isPlaceOrderActionAllowed(false);
++
++                this.getPlaceOrderDeferredObject()
++                    .fail(
++                        function () {
++                            self.isPlaceOrderActionAllowed(true);
++                        }
++                    ).done(
++                    function () {
++                        self.afterPlaceOrder();
++
++                        if (self.redirectAfterPlaceOrder) {
++                            //redirectOnSuccessAction.execute();
++                        }
++                    }
++                );
++
++                return true;
++            }
++
++            return false;
++        },
++
++        /**
++         * @return {*}
++         */
++        getPlaceOrderDeferredObject: function () {
++            return $.when(
++                placeOrderAction(this.getData(), this.messageContainer)
++            );
++        },
++
++        /**
++         * @return {Boolean}
++         */
++        selectPaymentMethod: function () {
++            selectPaymentMethodAction(this.getData());
++            checkoutData.setSelectedPaymentMethod(this.item.method);
++
++            return true;
++        },
++
++        isChecked: ko.computed(function () {
++            return quote.paymentMethod() ? quote.paymentMethod().method : null;
++        }),
++
++        isRadioButtonVisible: ko.computed(function () {
++            return paymentService.getAvailablePaymentMethods().length !== 1;
++        }),
++
++        /**
++         * Get payment method data
++         */
++        getData: function () {
++            return {
++                'method': this.item.method,
++                'po_number': null,
++                'additional_data': null
++            };
++        },
++
++        /**
++         * Get payment method type.
++         */
++        getTitle: function () {
++            return this.item.title;
++        },
++
++        /**
++         * Get payment method code.
++         */
++        getCode: function () {
++            return this.item.method;
++        },
++
++        /**
++         * @return {Boolean}
++         */
++        validate: function () {
++            return true;
++        },
++
++        /**
++         * @return {String}
++         */
++        getBillingAddressFormName: function () {
++            return 'billing-address-form-' + this.item.method;
++        },
++
++        /**
++         * Dispose billing address subscriptions
++         */
++        disposeSubscriptions: function () {
++            // dispose all active subscriptions
++            var billingAddressCode = 'billingAddress' + this.getCode();
++
++            registry.async('checkoutProvider')(function (checkoutProvider) {
++                checkoutProvider.off(billingAddressCode);
++            });
++        }
++    });
++});
+Index: app/code/Magento/MageConfCheckout/etc/di.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/etc/di.xml	(revision )
++++ app/code/Magento/MageConfCheckout/etc/di.xml	(revision )
+@@ -0,0 +1,15 @@
++<?xml version="1.0"?>
++        <!--
++        /**
++         * Copyright © Magento, Inc. All rights reserved.
++         * See COPYING.txt for license details.
++         */
++        -->
++<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
++    <type name="\Magento\Checkout\Api\GuestPaymentInformationManagementInterface">
++        <plugin name="avoid_db_write" type="Magento\MageConfCheckout\Model\Plugin\TransactionWrapper" />
++    </type>
++    <type name="Magento\Framework\Session\Storage">
++        <plugin name="avoid_session_write" type="Magento\MageConfCheckout\Model\Plugin\SessionWrapper" />
++    </type>
++</config>
+Index: app/code/Magento/MageConfCheckout/Model/Plugin/SessionWrapper.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/Model/Plugin/SessionWrapper.php	(revision )
++++ app/code/Magento/MageConfCheckout/Model/Plugin/SessionWrapper.php	(revision )
+@@ -0,0 +1,38 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++namespace Magento\MageConfCheckout\Model\Plugin;
++
++use Magento\Checkout\Model\Session;
++
++class SessionWrapper
++{
++    private $bannedKeys = [
++        'last_success_quote_id',
++        'last_quote_id',
++        'last_order_id',
++        'last_real_order_id',
++        'last_order_status',
++    ];
++
++    /**
++     * @param Session $session
++     * @param $key
++     * @param null $value
++     * @return mixed
++     * @internal param $subject
++     * @internal param $result
++     * @internal param $
++     */
++    public function aroundSetData(\Magento\Framework\Session\Storage $session, $proceed, $key, $value = null)
++    {
++        if (is_string($key) && in_array($key, $this->bannedKeys)) {
++            return $session;
++        }
++
++        $proceed($key, $value);
++    }
++}
+Index: app/code/Magento/MageConfCheckout/registration.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/registration.php	(revision )
++++ app/code/Magento/MageConfCheckout/registration.php	(revision )
+@@ -0,0 +1,9 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++use \Magento\Framework\Component\ComponentRegistrar;
++
++ComponentRegistrar::register(ComponentRegistrar::MODULE, 'Magento_MageConfCheckout', __DIR__);
+Index: app/code/Magento/MageConfCheckout/view/frontend/requirejs-config.js
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/view/frontend/requirejs-config.js	(revision )
++++ app/code/Magento/MageConfCheckout/view/frontend/requirejs-config.js	(revision )
+@@ -0,0 +1,12 @@
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++var config = {
++    map: {
++        '*': {
++            'Magento_Checkout/js/view/payment/default': 'Magento_MageConfCheckout/js/view/payment/default'
++        }
++    }
++};
+Index: app/code/Magento/MageConfCheckout/Model/Plugin/TransactionWrapper.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/Model/Plugin/TransactionWrapper.php	(revision )
++++ app/code/Magento/MageConfCheckout/Model/Plugin/TransactionWrapper.php	(revision )
+@@ -0,0 +1,49 @@
++<?php
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++
++namespace Magento\MageConfCheckout\Model\Plugin;
++
++use Magento\Framework\App\ResourceConnection;
++
++class TransactionWrapper
++{
++    /**
++     * @var ResourceConnection
++     */
++    private $resourceConnection;
++
++    /**
++     * TransactionWrapper constructor.
++     * @param ResourceConnection $resourceConnection
++     */
++    public function __construct(ResourceConnection $resourceConnection)
++    {
++        $this->resourceConnection = $resourceConnection;
++    }
++
++    /**
++     * @param $subject
++     * @param $result
++     * @return mixed
++     * @internal param $
++     */
++    public function beforeSavePaymentInformationAndPlaceOrder($subject)
++    {
++        $this->resourceConnection->getConnection()->beginTransaction();
++    }
++
++    /**
++     * @param $subject
++     * @param $result
++     * @return mixed
++     * @internal param $
++     */
++    public function afterSavePaymentInformationAndPlaceOrder($subject, $result)
++    {
++        $this->resourceConnection->getConnection()->rollBack();
++        return $result;
++    }
++}
+Index: app/code/Magento/MageConfCheckout/etc/module.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/code/Magento/MageConfCheckout/etc/module.xml	(revision )
++++ app/code/Magento/MageConfCheckout/etc/module.xml	(revision )
+@@ -0,0 +1,11 @@
++<?xml version="1.0"?>
++<!--
++/**
++ * Copyright © Magento, Inc. All rights reserved.
++ * See COPYING.txt for license details.
++ */
++-->
++<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
++    <module name="Magento_MageConfCheckout" setup_version="2.0.0">
++    </module>
++</config>
