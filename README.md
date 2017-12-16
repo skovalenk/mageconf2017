@@ -19,5 +19,5 @@ $. git apply --directory=app module_creation.patch
 
 ## Troubleshooting
 
-Sometimes phpstorm can`t create folder with module `MageConf` or `MageConfLayout` and tries to put files in similar directory.
+Sometimes phpstorm can't create folder with module `MageConf` or `MageConfLayout` and tries to put files in similar directory.
 So I proposed in this case to create directories manually
